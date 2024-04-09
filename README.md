@@ -96,6 +96,11 @@ MCS acts as a consumer and handles messages coming from a queue. It attempts to 
 - `id` - the satellite imaging request id
 - `satelliteID` - the satellite id
 
+#### A note on image syncing
+
+I am using a simple implementation to handle this, downloading a zip, and parsing ids from filenames.
+A better solution will be described in the [below section](#a-quick-but-important-note-on-my-implementation)
+
 ## Satellite
 
 ### Satellite API
@@ -159,7 +164,29 @@ This was done to ensure completion of the service in a reasonable period and to 
 
 - GRPC for communication (see above)
 - Simplified data storage methods (see above)
--
+
+#### Satellite Image Chunking Proposal
+
+GRPC seems most appropriate for this use case. Here is an approximation of how it could be implemented:
+
+##### Satellite Side
+
+- Satellite API would have two endpoints:
+  - `GetFileList`: Returns a list of files available for download with associated IDs and metadata (totalChunks, fileSize, etc.).
+  - `StreamFileChunks`: Sends chunks of a file piecewise by ID, returning file metadata (imagingRequestID, satelliteID) as well as information about the chunk (chunkData as bytes, chunkID). It should support restarting the stream from a specific chunkID for a given file.
+
+##### MCS Side
+
+- Files available and file metadata could be stored in the PostgreSQL database if appropriate.
+- Chunks will be stored in the filesystem or some appropriate temporary location.
+- Keep track of the "lastChunkID" for each file to enable restarting the stream if needed.
+- Reassemble the chunks and verify the integrity of the file using file metadata or checksums.
+- Finalize the reassembled file by storing it in S3 or any other determined storage location for final files.
+
+##### Error Handling and Retry Mechanism
+
+- Implement error handling to gracefully handle scenarios such as chunk transmission failures, timeouts, or missing chunks.
+- Keep track of the progress of chunk downloads and implement a resumption mechanism to continue from the last successfully received chunk in case of interruptions.
 
 # Observability Proposals
 
@@ -263,7 +290,7 @@ I kept idempotency in mind when implementing the job system. While not perfect, 
 
 ## PostgreSQL
 
-The requested database for this project, and my personal favorite RDBMS.
+The requested database for this project, and my personal favorite RDBMS. All Primary keys are integers, i'd probably refactor to be UUIDs given more time.
 
 ## Doppler
 
