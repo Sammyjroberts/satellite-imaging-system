@@ -1,11 +1,11 @@
 {
-  "name": "api",
+  "name": "satellite-consumer",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "doppler run -c tst -- node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "doppler run nodemon ./src/index.js"
   },
   "keywords": [],
@@ -13,12 +13,8 @@
   "license": "ISC",
   "dependencies": {
     "db": "workspace:*",
-    "express": "^4.19.2",
-    "jest": "^29.7.0",
-    "lodash": "^4.17.21",
-    "pino-http": "^9.0.0",
+    "observability": "workspace:*",
     "queue": "workspace:*",
-    "supertest": "^6.3.4",
     "utils": "workspace:*"
   },
   "devDependencies": {

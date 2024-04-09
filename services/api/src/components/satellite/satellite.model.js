@@ -15,7 +15,7 @@ const GET_SATELLITE_IMAGES_BY_SATELLITE_ID_QUERY = `
   INNER JOIN satellite s ON sir.satellite_id = s.id
   WHERE s.id = :satelliteID
   ORDER BY si.created_at DESC;
-  # TODO: maybe add some filtering / limiting here
+  -- TODO: maybe add some filtering / limiting here
 `;
 
 class SatelliteModel {

@@ -1,5 +1,5 @@
 import DB from "db";
-import { getRabbitMQChannel, queues } from "api-queue";
+import { getRabbitMQChannel, queues } from "queue";
 const db = DB.getInstance().getDb();
 
 class SatelliteImagingRequestModel {
@@ -21,7 +21,12 @@ class SatelliteImagingRequestModel {
 
       channel.sendToQueue(
         queues.IMAGE_PROCESSING_REQUEST_QUEUE,
-        Buffer.from(JSON.stringify(formattedResult))
+        Buffer.from(
+          JSON.stringify({
+            id: formattedResult.id,
+            satelliteID: formattedResult.satelliteID,
+          })
+        )
       );
 
       // raw query more efficent

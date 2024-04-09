@@ -13,17 +13,18 @@ export const up = function (knex) {
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Create the satellite_image table
+    -- Create the satellite_imaging_result table
     CREATE TABLE satellite_imaging_result (
       id SERIAL PRIMARY KEY,
       path VARCHAR(255) NOT NULL,
       satellite_imaging_request_id INTEGER NOT NULL,
+      downloaded BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
     -- Create indexes
-    CREATE INDEX idx_satellite_image_satellite_imaging_request_id ON satellite_image (satellite_imaging_request_id);
+    CREATE INDEX idx_satellite_image_satellite_imaging_request_id ON satellite_imaging_result (satellite_imaging_request_id);
   `);
 };
 

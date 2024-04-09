@@ -42,7 +42,9 @@ class SatelliteController {
     const satelliteID = req.params.satelliteID;
 
     // Call the getImages method of the SatelliteModel with the satellite ID
-    const [err, images] = asCallback(SatelliteModel.getImages(satelliteID));
+    const [err, images] = await asCallback(
+      SatelliteModel.getImages(satelliteID)
+    );
 
     // If an error occurred, pass it to the error handling middleware
     if (err) {

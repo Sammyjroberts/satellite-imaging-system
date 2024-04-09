@@ -2,12 +2,13 @@ import {
   getRabbitMQChannel,
   queues,
   IMAGE_PROCESSING_REQUEST_QUEUE_DELIVERY_LIMIT,
-} from "api-queue";
-import SatelliteCommunicator from "../communication_utils/SatelliteCommunicator";
-import { logger } from "../../../packages/observability/src";
-import { SatelliteImagingRequestStatus } from "utils";
+} from "queue";
+import SatelliteCommunicator from "../communication_utils/SatelliteCommunicator.js";
+import { logger } from "observability";
+import { SatelliteImagingRequestStatus, asCallback } from "utils";
 import axios from "axios";
 import DB from "db";
+import ImageDownloadHandler from "./ImageDownloadHandler.js";
 const db = DB.getInstance().getDb();
 
 async function consumeMessages() {
@@ -24,6 +25,15 @@ async function consumeMessages() {
       logger.info("We can communicate with the satellite. Starting consumer.", {
         connectionAttemptTime: new Date().toISOString(),
       });
+      // download all images asynchronously this will happen once per window for simplicity
+      void ImageDownloadHandler.downloadAndProcessImages()
+        .then(() => {
+          logger.info("Downloaded and processed images");
+        })
+        .catch((err) => {
+          logger.error({ msg: "Failed to download and process images", err });
+        });
+
       // Start consuming messages
       const { consumerTag: newConsumerTag } = await channel.consume(
         queues.IMAGE_PROCESSING_REQUEST_QUEUE,
@@ -31,28 +41,33 @@ async function consumeMessages() {
           let messageContent;
           try {
             // Process the message here
-            logger.info("Received message", { message });
+            logger.info({ msg: "Recieved message", message });
             messageContent = JSON.parse(message.content.toString());
+            logger.info({ msg: "Message content", messageContent });
             // send request to satellite
-            const resp = await asCallback(
-              axios.post(process.env.SATELLITE_URL + "/satellite_imaging_job", {
+
+            await axios.post(
+              process.env.SATELLITE_URL + "/api/satellite-imaging-job",
+              {
                 satelliteID: messageContent.satelliteID,
-                satelliteImagingRequestID:
-                  messageContent.satelliteImagingRequestID,
-              })
+                satelliteImagingRequestID: messageContent.id,
+              }
             );
+
             // update status in db
             await db("satellite_imaging_request")
               .where({
-                id: messageContent.satelliteImagingRequestID,
+                id: messageContent.id,
               })
               .update({
                 status: SatelliteImagingRequestStatus.IN_PROGRESS,
               });
+
             // acknowledge the message
             channel.ack(message);
-          } catch (error) {
-            logger.error("Error processing message", { error });
+            logger.info("Message processed successfully");
+          } catch (err) {
+            logger.error({ msg: "Error processing message", err });
             // If processing fails, check the number of retries
             const deathHeader = message.properties.headers["x-death"];
             const retryCount =
@@ -61,11 +76,14 @@ async function consumeMessages() {
             // manual testing mostly for logging and idempotent operations
             if (retryCount < IMAGE_PROCESSING_REQUEST_QUEUE_DELIVERY_LIMIT) {
               // Reject the message with requeue set to true
-              logger.warn("Message processing failed", {
-                messageContent,
-                error,
-                retryCount,
-              });
+              logger.warn(
+                "Message processing failed due to reaching max retries",
+                {
+                  messageContent,
+                  err,
+                  retryCount,
+                }
+              );
               channel.nack(message, false, true);
             } else {
               // If maximum retries reached, acknowledge the message to remove it from the queue
@@ -107,6 +125,7 @@ async function consumeMessages() {
   const fileURL = new URL(import.meta.url);
   const mainURL = new URL(`file://${process.argv[1]}`);
   if (fileURL.href === mainURL.href) {
+    await DB.getInstance().initDB(); // Doing this as I don't want to setup migration for docker
     await consumeMessages();
   }
 })();

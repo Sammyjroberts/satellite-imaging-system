@@ -2,6 +2,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// this config switch on service name is probably not ideal, but works for this iteration.
 const dbConfig = {
   api: {
     client: "postgresql",

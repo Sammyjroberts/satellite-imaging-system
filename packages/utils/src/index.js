@@ -1,4 +1,5 @@
-import { SatelliteImagingRequestStatus } from "./SatelliteImagingRequestStatus";
+import SatelliteImagingRequestStatus from "./SatelliteImagingRequestStatus.js";
+import SatelliteImageManager from "./SatelliteImageManager.js";
 
 /**
  * Converts a promise into a callback-style function.
@@ -26,3 +27,4 @@ export function isValidEnumValue(value, enumObj) {
 }
 
 export { SatelliteImagingRequestStatus };
+export { SatelliteImageManager };

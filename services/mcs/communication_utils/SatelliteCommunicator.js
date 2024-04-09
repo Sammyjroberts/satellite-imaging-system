@@ -1,3 +1,4 @@
+import { logger } from "observability";
 class SatelliteCommunicator {
   constructor(communicationWindow, waitWindow) {
     this.canCommunicate = false;
@@ -19,10 +20,8 @@ class SatelliteCommunicator {
 
   tryCommunicate() {
     if (this.canCommunicate) {
-      console.log("Communication successful!");
       return true;
     } else {
-      console.log("Communication failed. Please wait for the next window.");
       return false;
     }
   }

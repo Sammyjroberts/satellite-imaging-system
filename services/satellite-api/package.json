@@ -5,15 +5,23 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "doppler run nodemon ./src/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "archiver": "^7.0.1",
+    "db": "workspace:*",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "db": "workspace:*",
-    "utils": "workspace:*"
+    "pino-http": "^9.0.0",
+    "queue": "workspace:*",
+    "utils": "workspace:*",
+    "observability": "workspace:*"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }

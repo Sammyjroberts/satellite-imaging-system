@@ -52,7 +52,10 @@ class DB {
 
   async migrateLatest() {
     if (!this.connection) return;
-    const migrationsDirectory = path.join(__dirname, "..", "migrations");
+    const migrationsDirectory = path.join(
+      __dirname,
+      dbConfig.migrations.directory
+    );
     await this.connection.migrate.latest({
       directory: migrationsDirectory,
     });
@@ -77,12 +80,12 @@ class DB {
         "Invalid configuration. Connection must be an object with a 'database' property."
       );
     }
-    config.connection.database = "";
+    config.connection.database = "postgres";
     const tempDb = knex(config);
     const exists = await tempDb.raw(
       `SELECT 1 FROM pg_database WHERE datname = '${process.env.DATABASE}'`
     );
-    if (!exists.rows.length) {
+    if (!exists || exists.rows.length < 1) {
       await tempDb.raw(`CREATE DATABASE ${process.env.DATABASE}`);
     }
     await tempDb.destroy();
@@ -136,6 +139,10 @@ class DB {
       console.error(error);
       throw error;
     }
+  }
+  async initDB() {
+    await this.createDatabase();
+    await this.migrateLatest();
   }
 }
 

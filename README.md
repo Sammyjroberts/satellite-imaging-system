@@ -35,13 +35,77 @@
 
 # Services
 
+![Service Architecture](./service_architecture.png)
+
 ## Planet Side
 
 ### API
 
+A client-facing express application.
+
+#### Routes
+
+`POST - /api/satellite` - Create a new Satellite
+
+```json
+{
+  "name": "Some Name"
+}
+```
+
+`GET - /api/satellite/:satelliteID/images` - Get all images for a particular Satellite
+Note: This route currently fetches only the results and a URL. Streaming the image can be implemented if needed.
+
+`POST - /api/satellite-imaging-requests` - Request an image of a satellite
+
+```json
+{
+  "satelliteID": 1
+}
+```
+
 ### MCS
 
+MCS acts as a consumer and handles messages coming from a queue. It attempts to send the messages to the Satellite API. Additionally, MCS tries to sync images from the Satellite to the Planet Side database. This sync process occurs only once per window but can be set to run at an interval if desired.
+
+#### Message Format
+
+```json
+{
+  "id": 1, // the satellite_imaging_request_id
+  "satelliteID": 1 // the satellite id
+}
+```
+
 ## Satellite
+
+### Satellite API
+
+#### Routes
+
+`GET /api/satellite-image-results` - Attempts to download all the undownloaded files as a ZIP archive
+TODO: Improve the route name for clarity
+`POST /api/satellite-imaging-job` - attempts to add a new imaging job to the satellite
+
+```json
+{
+  "satelliteID": 1,
+  "satelliteImagingRequestID": 1
+}
+```
+
+### Satellite Consumer
+
+The Satellite Consumer processes imaging jobs by capturing an image and storing it in the filesystem. It also updates the job's status.
+
+#### Message Format
+
+```json
+{
+  "satelliteImagingRequestID": 1,
+  "satelliteID": 1
+}
+```
 
 ### A Quick, but important, note on my implementation.
 
@@ -68,9 +132,15 @@ This was done to ensure completion of the service in a reasonable period and to 
 - In addition, currently we are querying the satellite for images from MCS, but a better option would be to also allow the satellite to push images to the MCS for the duration of the window. This allows us to utilize the window as effectively as possible and keep the onboard storage of images to a minimum.
 - Finally, we would want to implement some kind of chunking strategy to stream files in pieces, so we can always restart image streaming if the window closes abruptly.
 
-### Satellite API
+#### Prediction
 
-### Satellite Image Job Consumer
+- Predicting when the windows will happen could allow for better communication with the satelite by ensuring the queue is started / stopped properly during these windows
+
+#### Optimizations
+
+- GRPC for communication (see above)
+- Simplified data storage methods (see above)
+-
 
 # Observability Proposals
 
@@ -103,33 +173,31 @@ Clients will be authenticated with a login or API Key, depending on how the clie
 
 ## Intra-Service Communication
 
-Intra service communication can be further secured via service keys or tokens, ensuring services can only communicate with services they are supposed to communicate with.
-
-# Future Concerns
+Intra service communication can be further secured via service keys or tokens, ensuring services can only communicate with services they are supposed to communicate with and lock down external requests.
 
 ## Docker
 
-## Satellite Imaging
-
-## Communication Window
-
-### Prediction
-
-- Predicting when the windows will happen could allow for better communication with the satelite by ensuring the queue is started / stopped properly during these windows
-
-### Optimizations
-
-- GRPC for communication (see above)
-- Simplified data storage methods (see above)
+- Currently the js service build process is not optimized, I am just copying the monorepo into each container and running the associated service
+- All dockerfiles are located at the root of repo, long term might be better to keep in the service itself.
+- All .env files are located at the root for convinence, as nothing in the .envs is "secret" at this time.
 
 # How To Run
+
+Running `docker compose up` or `docker compose up -d` from the root, should allow the image to run with all services and dependancies. the client facing api will be available at localhost:3000, and the satellite api at localhost:3001
 
 ## Monorepo
 
 While not a great fit for every project, I have been enjoying utilizing them lately, even with the quirks. This project is a monorepo with two important root folders:
 
-- `./services` - these are applications intended to be run on their own.
-- `./packages` - these are modules intended to be utilized by services or each other.
+- `./services` - these are applications intended to be run on their own. [detailed above](#services)
+- `./packages` - these are modules intended to be utilized by services or each other. [detailed below](###packages)
+
+### Packages
+
+- db - the home of the database singleton we use throughout the services, as well as migration folders.
+- observability - all utilities related to observability, currently, only the logger
+- queue - the home of the queue singleton we use throughout the services.
+- utils - any utility functions, classes, or types go here.
 
 ### Turbo
 
@@ -149,11 +217,30 @@ While I am not using much testing in this example, I do use Jest as my testing f
 
 ### Knex
 
-Knex is a lightweight tool I use when I need to use a relational database. I find the migration format and framework to be extremely powerful and easy to use. It is exceedingly easy to write raw queries/bindings. The query builder is also nice when appropriate.
+Knex is a lightweight tool I use when I need to use a relational database. I find the migration format and framework to be extremely powerful and easy to use. It is exceedingly easy to write raw queries/bindings. The query builder is also nice when appropriate. Migrations for each database are in their respective folder under `./packages/db`
+
+- satellite_migrations will contain any migrations for the satellite-db
+- api_migrations will contain any migrations for the api-db
 
 ## RabbitMQ
 
 RabbitMQ has built-in support for dead-letter queues, retries, quorum/durable queues, and as such, is a great tool to use for this project.
+
+### Important note on RabbitMQ implementation
+
+I have not attempted to create an extremely rigorous message queueing system. The main image request queue that the MCS communicates with has a retry limit but no retry delay or significant dead letter handling. The satellite queue does not utilize its dead letter queue.
+
+I have added the RabbitMQ Management UI, which will allow us to shovel messages from the DLQ back into the main queue as a short-term mechanism for retrying messages.
+
+### Idempotency
+
+I kept idempotency in mind when implementing the job system. While not perfect, it should lead to no "error" level side effects. The worst case is that a message gets processed twice, and two images are created, but that isn't a fatal error per my understanding of the requirements.
+
+### Future Improvements
+
+- Identify when messages are malformed or can never be processed and add them to a permanent dead letter queue.
+- In the case of intermittent issues, use a mechanism to place nacked messages back to the end of the queue, so one bad message doesn't block good messages.
+- Add observability around messages in the DLQ so we can easily retry or give the user some notification that their request failed.
 
 ## PostgreSQL
 
@@ -192,6 +279,10 @@ By forcing developers to request the instance used for a connection, we can chec
 Initialization of a connection can sometimes be forgotten or lost during refactoring, which can be a bear to debug. By only connecting to the services when needed, we sacrifice a bit on initial connection time, but the behavior of the application becomes much more idiomatic.
 
 Singletons are not always preferred, especially when custom reconnect logic is significant. However, I have found that they are extremely helpful, particularly for smaller, quick projects.
+
+### Current Issues
+
+- DB and Queue connections are determined by process.env.SERVICE_NAME as these were built without intention for reuse. I have thrown together a quick fix, but something that should be refactored.
 
 ## A Note on File Naming Conventions
 

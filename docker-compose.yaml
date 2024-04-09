@@ -1,6 +1,7 @@
 version: "3"
 
 services:
+  # Postgres DBs
   postgres-api:
     image: postgres:16.1
     ports:
@@ -8,10 +9,32 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: api_dev
+      POSTGRES_DB: api
     volumes:
       - pgdata-api:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d api -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  postgres-satellite:
+    image: postgres:16.1
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: satellite
+      POSTGRES_DB: satellite
+    volumes:
+      - pgdata-satellite:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d satellite -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ
   rabbitmq-api:
     image: rabbitmq:3.13.1-management
     ports:
@@ -22,17 +45,12 @@ services:
       RABBITMQ_DEFAULT_PASS: password
     volumes:
       - rabbitmqdata-api:/var/lib/rabbitmq
-
-  postgres-satellite:
-    image: postgres:16.1
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_USER: satellite
-      POSTGRES_PASSWORD: satellite
-      POSTGRES_DB: satellite_dev
-    volumes:
-      - pgdata-satellite:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_port_connectivity"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   rabbitmq-satellite:
     image: rabbitmq:3.13.1-management
@@ -44,9 +62,73 @@ services:
       RABBITMQ_DEFAULT_PASS: satellite_pass
     volumes:
       - rabbitmqdata-satellite:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_port_connectivity"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
+  # Node Services
+  api:
+    env_file: ./.api.env
+    build:
+      context: .
+      dockerfile: ./api.Dockerfile
+    volumes:
+      - planetside-image-directory:/data/satellite-images-planetside/
+    ports:
+      - 3000:3000
+    depends_on:
+      rabbitmq-api:
+        condition: service_healthy
+      postgres-api:
+        condition: service_healthy
+
+  mcs:
+    env_file: ./.mcs.env
+    build:
+      context: .
+      dockerfile: ./mcs.Dockerfile
+    volumes:
+      - planetside-image-directory:/data/satellite-images-planetside/
+    depends_on:
+      rabbitmq-api:
+        condition: service_healthy
+      postgres-api:
+        condition: service_healthy
+
+  satellite-consumer:
+    env_file: ./.satelliteconsumer.env
+    build:
+      context: .
+      dockerfile: ./satelliteconsumer.Dockerfile
+    volumes:
+      - satellite-image-directory:/data/satellite-images/
+    depends_on:
+      rabbitmq-satellite:
+        condition: service_healthy
+      postgres-satellite:
+        condition: service_healthy
+
+  satellite-api:
+    env_file: ./.satelliteapi.env
+    build:
+      context: .
+      dockerfile: ./satelliteapi.Dockerfile
+    volumes:
+      - satellite-image-directory:/data/satellite-images/
+    ports:
+      - 3001:3001
+    depends_on:
+      rabbitmq-satellite:
+        condition: service_healthy
+      postgres-satellite:
+        condition: service_healthy
 volumes:
   pgdata-api:
   rabbitmqdata-api:
   pgdata-satellite:
   rabbitmqdata-satellite:
+  satellite-image-directory:
+  planetside-image-directory:

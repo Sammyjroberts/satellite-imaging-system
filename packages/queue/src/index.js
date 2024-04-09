@@ -1,8 +1,11 @@
 import amqp from "amqplib";
 import { logger } from "observability";
+
 export const queues = {
   IMAGE_PROCESSING_REQUEST_QUEUE: "image-processing-request-queue",
   IMAGE_PROCESSING_REQUEST_DLX_QUEUE: "image-processing-request-dlx-queue",
+  IMAGING_JOB_QUEUE: "imaging-job-queue",
+  IMAGING_JOB_DLX_QUEUE: "imaging-job-dlx-queue",
 };
 
 export const IMAGE_PROCESSING_REQUEST_QUEUE_DELIVERY_LIMIT = 10;
@@ -81,16 +84,31 @@ export async function getRabbitMQChannel() {
  * @param {amqp.Channel} channel
  */
 export async function assertQueues(channel) {
-  await channel.assertQueue(queues.IMAGE_PROCESSING_REQUEST_QUEUE, {
-    arguments: {
-      "x-dead-letter-exchange": "",
-      "x-dead-letter-routing-key": queues.IMAGE_PROCESSING_REQUEST_DLX_QUEUE,
-      "x-durable": true,
-      "x-delivery-limit": IMAGE_PROCESSING_REQUEST_QUEUE_DELIVERY_LIMIT,
-      "x-queue-type": "quorum",
-    },
-  });
-  await channel.assertQueue(queues.IMAGE_PROCESSING_REQUEST_DLX_QUEUE, {
-    durable: true,
-  });
+  // again, not ideal, but a more rigorus solution takes a bit of time so I am going with it.
+  if (process.env.SERVICE_NAME === "api") {
+    await channel.assertQueue(queues.IMAGE_PROCESSING_REQUEST_QUEUE, {
+      arguments: {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": queues.IMAGE_PROCESSING_REQUEST_DLX_QUEUE,
+        "x-durable": true,
+        "x-delivery-limit": IMAGE_PROCESSING_REQUEST_QUEUE_DELIVERY_LIMIT,
+        "x-queue-type": "quorum",
+      },
+    });
+    await channel.assertQueue(queues.IMAGE_PROCESSING_REQUEST_DLX_QUEUE, {
+      durable: true,
+    });
+  } else if (process.env.SERVICE_NAME === "satellite") {
+    await channel.assertQueue(queues.IMAGING_JOB_QUEUE, {
+      arguments: {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": queues.IMAGING_JOB_DLX_QUEUE,
+        "x-durable": true,
+        "x-queue-type": "quorum",
+      },
+    });
+    await channel.assertQueue(queues.IMAGING_JOB_DLX_QUEUE, {
+      durable: true,
+    });
+  }
 }
