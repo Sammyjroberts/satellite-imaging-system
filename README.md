@@ -33,6 +33,22 @@
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡿⠛⠉⠉⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ```
 
+## TLDR
+
+This project is a solution to facilitate communication between a satellite and end-users, allowing users to request and receive satellite images. The system consists of a client-facing API, a Mission Control Software service (MCS), a satellite service, and a PostgreSQL database, all containerized using Docker.
+
+The client API provides endpoints for adding tracked client satellites, requesting images of those satellites, and retrieving the captured images. When a user requests an image through the client API, the request is stored in the database and sent to the MCS via a RabbitMQ message queue. The MCS, which intermittently communicates with the satellite service to simulate periodic communication when the satellite is over a ground station, retrieves the imaging requests from the queue and sends them to the satellite service.
+
+The satellite service receives the imaging requests from the MCS through another RabbitMQ queue. Upon receiving a request, it captures a random image to represent the requested satellite image and stores it locally. The satellite service also listens for download requests from the MCS on a separate queue. When a download request is received, the satellite service sends the stored images back to the MCS.
+
+The MCS, upon receiving the downloaded images from the satellite service, stores them in the database. The client API can then retrieve these images when requested by the end-user. The use of message queues (RabbitMQ) enables asynchronous communication between the services, allowing for scalability and loose coupling. It also facilitates retrying failed requests and handling communication interruptions gracefully.
+
+The solution utilizes a monorepo structure with separate folders for services and packages. It leverages various tools and libraries such as Turbo, ESLint, Prettier, PNPM, Jest, Knex, and RabbitMQ for development, testing, and message queueing. The project also includes observability proposals using OpenTelemetry and options for self-hosted or managed monitoring solutions.
+
+To run the project, simply execute docker compose up or docker compose up -d from the root directory. The client-facing API will be available at localhost:3000, and the satellite API at localhost:3001. RabbitMQ management UI can be accessed at localhost:15672.
+
+For detailed information on the architecture, API routes, implementation considerations, and future improvements, please refer to the full documentation below.
+
 # Services
 
 ![Service Architecture](./service_architecture.png)
@@ -197,10 +213,10 @@ While not a great fit for every project, I have been enjoying utilizing them lat
 
 ### Packages
 
-- db - the home of the database singleton we use throughout the services, as well as migration folders.
-- observability - all utilities related to observability, currently, only the logger
-- queue - the home of the queue singleton we use throughout the services.
-- utils - any utility functions, classes, or types go here.
+- `db` - the home of the database singleton we use throughout the services, as well as migration folders.
+- `observability` - all utilities related to observability, currently, only the logger
+- `queue` - the home of the queue singleton we use throughout the services.
+- `utils` - any utility functions, classes, or types go here.
 
 ### Turbo
 
