@@ -21,9 +21,11 @@ app.use(express.json());
 app.use("/api", apiRouter);
 
 const server = app.listen(port, async () => {
-  await DB.getInstance().initDB(); // Doing this as I don't want to setup migration for docker
+  await DB.getInstance().initDB(); // Simple solution to initilizing the db, as I want to limit busywork
   logger.info(`Server is running on port ${port}`);
 });
+
+// TODO: implement error handling middleware
 
 export const closeServer = () => {
   server.close();

@@ -43,9 +43,8 @@ async function consumeMessages() {
             // Process the message here
             logger.info({ msg: "Recieved message", message });
             messageContent = JSON.parse(message.content.toString());
-            logger.info({ msg: "Message content", messageContent });
-            // send request to satellite
 
+            // send request to satellite
             await axios.post(
               process.env.SATELLITE_URL + "/api/satellite-imaging-job",
               {
@@ -125,7 +124,7 @@ async function consumeMessages() {
   const fileURL = new URL(import.meta.url);
   const mainURL = new URL(`file://${process.argv[1]}`);
   if (fileURL.href === mainURL.href) {
-    await DB.getInstance().initDB(); // Doing this as I don't want to setup migration for docker
+    await DB.getInstance().initDB(); // Simple solution to initilizing the db, as I want to limit busywork
     await consumeMessages();
   }
 })();
