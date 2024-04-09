@@ -1,0 +1,52 @@
+version: "3"
+
+services:
+  postgres-api:
+    image: postgres:16.1
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: api_dev
+    volumes:
+      - pgdata-api:/var/lib/postgresql/data
+
+  rabbitmq-api:
+    image: rabbitmq:3.13.1-management
+    ports:
+      - "5672:5672" # RabbitMQ server
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    volumes:
+      - rabbitmqdata-api:/var/lib/rabbitmq
+
+  postgres-satellite:
+    image: postgres:16.1
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: satellite
+      POSTGRES_PASSWORD: satellite
+      POSTGRES_DB: satellite_dev
+    volumes:
+      - pgdata-satellite:/var/lib/postgresql/data
+
+  rabbitmq-satellite:
+    image: rabbitmq:3.13.1-management
+    ports:
+      - "5673:5672" # RabbitMQ server
+      - "15673:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: satellite_user
+      RABBITMQ_DEFAULT_PASS: satellite_pass
+    volumes:
+      - rabbitmqdata-satellite:/var/lib/rabbitmq
+
+volumes:
+  pgdata-api:
+  rabbitmqdata-api:
+  pgdata-satellite:
+  rabbitmqdata-satellite:
