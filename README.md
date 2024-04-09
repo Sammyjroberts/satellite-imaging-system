@@ -72,10 +72,13 @@ MCS acts as a consumer and handles messages coming from a queue. It attempts to 
 
 ```json
 {
-  "id": 1, // the satellite_imaging_request_id
-  "satelliteID": 1 // the satellite id
+  "id": 1,
+  "satelliteID": 1
 }
 ```
+
+- `id` - the satellite imaging request id
+- `satelliteID` - the satellite id
 
 ## Satellite
 
